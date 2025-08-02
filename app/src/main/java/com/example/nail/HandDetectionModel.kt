@@ -16,9 +16,10 @@ import org.tensorflow.lite.support.image.ops.ResizeOp
 import org.tensorflow.lite.support.tensorbuffer.TensorBuffer
 import kotlin.math.max
 import kotlin.math.min
+import kotlinx.coroutines.*
 
 // Helper class for Hand detection TFLite model
-class HandDetectionModel( context: Context ) {
+class HandDetectionModel( private val context: Context ) {
 
     // I/O details for the hand detection model.
     // Refer to the comments of this script ->
@@ -31,6 +32,7 @@ class HandDetectionModel( context: Context ) {
     private val confidenceScoresTensorShape = intArrayOf( 1 , maxDetections ) // [ 1 , 10 ]
     private val classesTensorShape = intArrayOf( 1 , maxDetections ) // [ 1 , 10 ]
     private val numBoxesTensorShape = intArrayOf( 1 ) // [ 1 , ]
+
     // Input tensor processor for quantized and non-quantized versions of the model.
     private val inputImageProcessorQuantized = ImageProcessor.Builder()
         .add( ResizeOp( modelInputImageDim , modelInputImageDim , ResizeOp.ResizeMethod.BILINEAR ) )
@@ -44,42 +46,51 @@ class HandDetectionModel( context: Context ) {
     // See app/src/main/assets for the TFLite model.
     private val modelName = "model.tflite"
     private val numThreads = 4
-    private var interpreter : Interpreter
+    private var interpreter: Interpreter? = null // Made nullable
     // Confidence threshold for filtering the predictions
     private val filterThreshold = 0.8f
 
     private var areInputFrameDimsInitialized = false
     private var inputFrameWidth = 0
     private var inputFrameHeight = 0
+    private var isModelInitialized = false
 
+    // Initialize the model asynchronously
+    suspend fun initializeModel() = withContext(Dispatchers.IO) {
+        if (isModelInitialized) return@withContext
 
+        try {
+            // Initialize TFLite Interpreter
+            val interpreterOptions = Interpreter.Options().apply {
+                setNumThreads( numThreads )
 
-    init {
-        // Initialize TFLite Interpreter
-        val interpreterOptions = Interpreter.Options().apply {
-            setNumThreads( numThreads )
-
-            // Add the NNApiDelegate if supported.
-            // See -> https://www.tensorflow.org/lite/performance/nnapi#initializing_the_nnapi_delegate
-            if ( Build.VERSION.SDK_INT >= Build.VERSION_CODES.P ) {
-                Logger.logInfo( "NNAPI is supported on this device." )
-                addDelegate( NnApiDelegate() )
+                // Add the NNApiDelegate if supported.
+                // See -> https://www.tensorflow.org/lite/performance/nnapi#initializing_the_nnapi_delegate
+                if ( Build.VERSION.SDK_INT >= Build.VERSION_CODES.P ) {
+                    Logger.logInfo( "NNAPI is supported on this device." )
+                    addDelegate( NnApiDelegate() )
+                }
             }
+            interpreter = Interpreter(FileUtil.loadMappedFile( context, modelName ) , interpreterOptions )
+            Logger.logInfo( "TFLite interpreter created." )
+            isModelInitialized = true
+        } catch (e: Exception) {
+            Logger.logError("Failed to initialize TFLite model: ${e.message}")
+            throw e
         }
-        interpreter = Interpreter(FileUtil.loadMappedFile( context, modelName ) , interpreterOptions )
-        Logger.logInfo( "TFLite interpreter created." )
     }
-
 
     fun reset() {
         areInputFrameDimsInitialized = false
     }
 
-
     fun flow( cameraFrameBitmap : Bitmap  ) : List<Prediction> {
+        if (!isModelInitialized || interpreter == null) {
+            Logger.logError("Model not initialized. Call initializeModel() first.")
+            return emptyList()
+        }
         return run( cameraFrameBitmap )
     }
-
 
     private fun run( inputImage : Bitmap ) : List<Prediction> {
         // Store the width and height of the input frames as they will be used for future transformations.
@@ -110,7 +121,7 @@ class HandDetectionModel( context: Context ) {
         )
 
         val t1 = System.currentTimeMillis()
-        interpreter.runForMultipleInputsOutputs( arrayOf(tensorImage.buffer), outputs )
+        interpreter!!.runForMultipleInputsOutputs( arrayOf(tensorImage.buffer), outputs )
         Logger.logInfo( "Model inference time -> ${System.currentTimeMillis() - t1} ms." )
 
         return processOutputs( confidenceScores , boundingBoxes )

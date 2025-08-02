@@ -2,12 +2,11 @@ plugins {
     alias(libs.plugins.android.application)
     alias(libs.plugins.jetbrains.kotlin.android)
     id("com.chaquo.python")
-    id("kotlin-android")
 }
 
 android {
     namespace = "com.example.nail"
-    compileSdk = 34
+    compileSdk = 35
 
     defaultConfig {
         applicationId = "com.example.nail"
@@ -22,8 +21,13 @@ android {
         }
     }
 
-    aaptOptions {
-        noCompress("tflite")
+    packaging {
+        resources {
+            excludes += "/META-INF/{AL2.0,LGPL2.1}"
+        }
+        jniLibs {
+            useLegacyPackaging = true
+        }
     }
 
     buildTypes {
@@ -51,7 +55,7 @@ chaquopy {
         pip {
             install("numpy")
             install("scikit-learn")
-            install("opencv-python")
+            install("opencv-python-headless")
             install("tflite-runtime")
             install("pillow")
         }
@@ -59,11 +63,11 @@ chaquopy {
 }
 
 dependencies {
-    implementation("androidx.core:core-ktx:1.12.0")
-    implementation("androidx.appcompat:appcompat:1.6.1")
-    implementation("com.google.android.material:material:1.10.0")
-    implementation("androidx.activity:activity:1.9.0")
-    implementation("androidx.constraintlayout:constraintlayout:2.1.0")
+    implementation(libs.androidx.core.ktx)
+    implementation(libs.androidx.appcompat)
+    implementation(libs.material)
+    implementation(libs.androidx.activity)
+    implementation(libs.androidx.constraintlayout)
 
     // CameraX dependencies
     implementation("androidx.camera:camera-core:1.3.0")
@@ -77,16 +81,12 @@ dependencies {
     implementation("org.tensorflow:tensorflow-lite-gpu:2.9.0")
     implementation("org.tensorflow:tensorflow-lite-support:0.4.0")
 
-    // Python dependencies via Chaquopy
-    implementation("com.chaquo.python:gradle:12.0.1")
-
     // Kotlin Coroutines
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.4.1")
-    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.4.1")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-core:1.7.3")
+    implementation("org.jetbrains.kotlinx:kotlinx-coroutines-android:1.7.3")
 
     // Testing dependencies
-    testImplementation("junit:junit:4.+")
-    androidTestImplementation("androidx.test.ext:junit:1.1.3")
-    androidTestImplementation("androidx.test.espresso:espresso-core:3.4.0")
+    testImplementation(libs.junit)
+    androidTestImplementation(libs.androidx.junit)
+    androidTestImplementation(libs.androidx.espresso.core)
 }
-

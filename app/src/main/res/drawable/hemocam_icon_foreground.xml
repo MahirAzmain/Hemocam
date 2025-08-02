@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- Replace this with your Hemocam icon design -->
+    <group android:scaleX="0.67"
+           android:scaleY="0.67"
+           android:translateX="18"
+           android:translateY="18">
+        <!-- Simple nail/medical icon placeholder - customize this -->
+        <path
+            android:fillColor="#FFFFFF"
+            android:pathData="M36,20c-8.84,0 -16,7.16 -16,16v16c0,8.84 7.16,16 16,16s16,-7.16 16,-16V36C52,27.16 44.84,20 36,20zM48,52c0,6.63 -5.37,12 -12,12s-12,-5.37 -12,-12V36c0,-6.63 5.37,-12 12,-12s12,5.37 12,12V52z"/>
+        <path
+            android:fillColor="#FFFFFF"
+            android:pathData="M36,38m-4,0a4,4 0,1 1,8 0a4,4 0,1 1,-8 0"/>
+    </group>
+</vector>

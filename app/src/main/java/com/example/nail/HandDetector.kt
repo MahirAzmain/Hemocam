@@ -9,13 +9,27 @@ import java.nio.channels.FileChannel
 import android.content.Context
 import android.graphics.Bitmap
 import android.graphics.Rect
+import kotlinx.coroutines.*
 
 class HandDetector(context: Context) {
     private val handDetectionModel = HandDetectionModel(context)
+    private var isInitialized = false
+
+    // Initialize the model asynchronously
+    suspend fun initialize() {
+        if (!isInitialized) {
+            handDetectionModel.initializeModel()
+            isInitialized = true
+        }
+    }
 
     // Predicts if the image contains a hand
     fun predict(image: Bitmap): Boolean {
         return try {
+            if (!isInitialized) {
+                Log.w("HandDetector", "Model not initialized")
+                return false
+            }
             val predictions = handDetectionModel.flow(image)
             predictions.isNotEmpty()
         } catch (e: Exception) {
@@ -28,6 +42,10 @@ class HandDetector(context: Context) {
     // Returns the bounding boxes of detected hands in the image
     fun getBoundingBoxes(image: Bitmap): List<Rect> {
         return try {
+            if (!isInitialized) {
+                Log.w("HandDetector", "Model not initialized")
+                return emptyList()
+            }
             val predictions = handDetectionModel.flow(image)
             predictions.map { it.boundingBox }
         } catch (e: Exception) {

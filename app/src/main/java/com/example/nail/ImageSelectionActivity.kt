@@ -1,4 +1,3 @@
-
 package com.example.nail
 
 import android.Manifest
@@ -11,6 +10,7 @@ import android.graphics.Rect
 import android.net.Uri
 import android.os.Bundle
 import android.provider.MediaStore
+import android.util.Log
 import android.widget.Button
 import android.widget.ImageButton
 import com.example.nail.HandDetector
@@ -25,6 +25,7 @@ import androidx.core.content.FileProvider
 import java.io.File
 import java.io.IOException
 import kotlin.math.roundToInt
+import kotlinx.coroutines.*
 
 class ImageSelectionActivity : AppCompatActivity() {
 
@@ -38,14 +39,16 @@ class ImageSelectionActivity : AppCompatActivity() {
     private var selectedImageWidth: Int = -1
     private var selectedImageHeight: Int = -1
 
-
     private val cameraPermission = Manifest.permission.CAMERA
     private val storagePermission = Manifest.permission.READ_EXTERNAL_STORAGE
 
     private var currentPhotoPath: String? = null
     private var selectedImage: Bitmap? = null
-    private lateinit var handDetector: HandDetector // Added Hand Detector
+    private var handDetector: HandDetector? = null // Made nullable
     private lateinit var detectedBoundingBoxes: List<Rect>
+    private var isModelLoading = false
+    private val activityScope = CoroutineScope(Dispatchers.Main + SupervisorJob())
+    private var isActivityDestroyed = false // Add flag to track activity state
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -59,7 +62,8 @@ class ImageSelectionActivity : AppCompatActivity() {
         resetButton = findViewById(R.id.resetButton)
         goNextButton = findViewById(R.id.goNext)
 
-        handDetector = HandDetector(this) // Initialize Hand Detector
+        // Initialize HandDetector asynchronously to prevent ANR
+        initializeHandDetectorAsync()
 
         sizeSlider.setOnSeekBarChangeListener(object : SeekBar.OnSeekBarChangeListener {
             override fun onProgressChanged(seekBar: SeekBar?, progress: Int, fromUser: Boolean) {
@@ -98,6 +102,38 @@ class ImageSelectionActivity : AppCompatActivity() {
             }
         }
     }
+
+    private fun initializeHandDetectorAsync() {
+        if (isActivityDestroyed) return // Check if activity is destroyed
+
+        isModelLoading = true
+        activityScope.launch {
+            try {
+                withContext(Dispatchers.IO) {
+                    // Check again in case activity was destroyed during context switch
+                    if (isActivityDestroyed) return@withContext
+
+                    // Create HandDetector and initialize it
+                    val detector = HandDetector(this@ImageSelectionActivity)
+                    detector.initialize()
+                    handDetector = detector
+                }
+                // Model loaded successfully - check if activity is still alive
+                if (!isActivityDestroyed) {
+                    isModelLoading = false
+                    Toast.makeText(this@ImageSelectionActivity, "AI model loaded successfully", Toast.LENGTH_SHORT).show()
+                }
+            } catch (e: Exception) {
+                // Handle initialization failure
+                if (!isActivityDestroyed) {
+                    isModelLoading = false
+                    Log.e("ImageSelectionActivity", "Failed to initialize HandDetector", e)
+                    Toast.makeText(this@ImageSelectionActivity, "Failed to load AI model", Toast.LENGTH_LONG).show()
+                }
+            }
+        }
+    }
+
     private fun checkStoragePermission(): Boolean {
         return if (android.os.Build.VERSION.SDK_INT >= android.os.Build.VERSION_CODES.TIRAMISU) {
             ContextCompat.checkSelfPermission(
@@ -189,8 +225,18 @@ class ImageSelectionActivity : AppCompatActivity() {
         selectedImage = imageBitmap
         imageView.setImageBitmap(imageBitmap)
 
+        // Check if model is still loading
+        if (isModelLoading || handDetector == null) {
+            Toast.makeText(
+                this,
+                "Model is still loading, please wait...",
+                Toast.LENGTH_SHORT
+            ).show()
+            return
+        }
+
         // Check if the image is a hand
-        val isHand = handDetector.predict(imageBitmap)
+        val isHand = handDetector?.predict(imageBitmap) ?: false
         if (!isHand) {
             Toast.makeText(
                 this,
@@ -204,7 +250,7 @@ class ImageSelectionActivity : AppCompatActivity() {
         }
 
         // Fetch bounding boxes
-        detectedBoundingBoxes = handDetector.getBoundingBoxes(imageBitmap)
+        detectedBoundingBoxes = handDetector!!.getBoundingBoxes(imageBitmap)
 
         // Get the selected image width and height
         selectedImageWidth = imageBitmap.width
@@ -403,5 +449,41 @@ class ImageSelectionActivity : AppCompatActivity() {
             putExtra("path", currentPhotoPath)
         }
         startActivity(intent)
+    }
+
+    override fun onPause() {
+        super.onPause()
+        // Clear any pending UI operations when activity is paused
+        Log.d("ImageSelectionActivity", "Activity paused")
+    }
+
+    override fun onStop() {
+        super.onStop()
+        // Activity is no longer visible, clean up resources
+        Log.d("ImageSelectionActivity", "Activity stopped")
+    }
+
+    override fun onDestroy() {
+        super.onDestroy()
+
+        // Set the destruction flag first
+        isActivityDestroyed = true
+
+        // Cancel any ongoing coroutines to prevent memory leaks
+        activityScope.cancel()
+
+        // Clean up bitmap resources to prevent memory leaks
+        selectedImage?.let { bitmap ->
+            if (!bitmap.isRecycled) {
+                bitmap.recycle()
+            }
+        }
+        selectedImage = null
+
+        // Clear hand detector reference
+        handDetector?.reset()
+        handDetector = null
+
+        Log.d("ImageSelectionActivity", "Activity destroyed and resources cleaned up")
     }
 }
