@@ -99,6 +99,11 @@ Hemocam is a cutting-edge Android application designed to detect hemoglobin leve
 
 ## Screenshots:
 
+# Window slider
+![WhatsApp Image 2025-08-03 at 14 52 26](https://github.com/user-attachments/assets/72b5779c-b703-49d5-ad57-1942ab5e3dc3)
+![WhatsApp Image 2025-08-03 at 14 52 26 (1)](https://github.com/user-attachments/assets/a01763b9-cf87-4aa6-be80-2a6509010ce3)
+![WhatsApp Image 2025-08-03 at 14 52 27](https://github.com/user-attachments/assets/c5642078-b244-4168-8815-7b3088b75306)
+
 # APP Icon
 ![WhatsApp Image 2025-08-02 at 02 10 36](https://github.com/user-attachments/assets/3ad7aa89-0259-46cd-8978-c947bd5c0381)
 
